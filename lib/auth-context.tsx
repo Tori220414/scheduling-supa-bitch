@@ -105,7 +105,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Get initial session
     const getInitialSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error("Error getting initial session:", error)
+          // If there's an auth error (like invalid refresh token), clear the session
+          if (error.message.includes('refresh')) {
+            await supabase.auth.signOut()
+          }
+          return
+        }
         
         if (session?.user && mounted) {
           const profile = await ensureUserProfile(session.user)
@@ -117,6 +126,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       } catch (error) {
         console.error("Error getting initial session:", error)
+        // Clear potentially corrupted session
+        await supabase.auth.signOut()
       } finally {
         if (mounted) {
           setLoading(false)
@@ -131,22 +142,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
       async (event, session) => {
         if (!mounted) return
 
-        if (session?.user) {
-          let profile: UserProfile | undefined
-          
-          // For new sign-ups, ensure profile exists
-          if (event === "SIGNED_UP" || event === "SIGNED_IN") {
-            profile = await ensureUserProfile(session.user)
-          } else {
-            profile = await loadUserProfile(session.user)
-          }
+        try {
+          if (session?.user) {
+            let profile: UserProfile | undefined
+            
+            // For new sign-ups, ensure profile exists
+            if (event === "SIGNED_UP" || event === "SIGNED_IN") {
+              profile = await ensureUserProfile(session.user)
+            } else {
+              profile = await loadUserProfile(session.user)
+            }
 
-          setUser({
-            id: session.user.id,
-            email: session.user.email!,
-            profile
-          })
-        } else {
+            setUser({
+              id: session.user.id,
+              email: session.user.email!,
+              profile
+            })
+          } else {
+            setUser(null)
+          }
+        } catch (error) {
+          console.error("Error handling auth state change:", error)
           setUser(null)
         }
         
