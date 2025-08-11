@@ -1,40 +1,19 @@
 "use client"
-
-import * as React from "react"
 import Link from "next/link"
-import { getSupabase } from "@/lib/supabase-client"
+import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
-import { CircleUserRound, LogIn, LogOut, Home } from "lucide-react"
+import { CircleUserRound, LogIn, LogOut, Home, LayoutDashboard } from "lucide-react"
 
 export function TopNav() {
-  const [authed, setAuthed] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
-
-  React.useEffect(() => {
-    let unsub = () => {}
-    async function init() {
-      try {
-        const supabase = getSupabase()
-        const { data } = await supabase.auth.getSession()
-        setAuthed(!!data.session)
-        const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-          setAuthed(!!session)
-        })
-        unsub = () => listener.subscription.unsubscribe()
-      } catch (e: any) {
-        setError(e?.message || "Supabase not configured")
-      }
-    }
-    init()
-    return () => unsub()
-  }, [])
+  const { user, loading } = useAuth()
 
   async function signOut() {
     try {
+      const { getSupabase } = await import("@/lib/supabase-client")
       const supabase = getSupabase()
       await supabase.auth.signOut()
     } catch (e: any) {
-      setError(e?.message || "Sign out failed")
+      console.error("Sign out failed:", e?.message)
     }
   }
 
@@ -46,6 +25,14 @@ export function TopNav() {
             <Home className="h-4 w-4" />
             <span>SchedulingBitch</span>
           </Link>
+
+          {user && (
+            <Link href="/dashboard" className="flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900">
+              <LayoutDashboard className="h-4 w-4" />
+              Dashboard
+            </Link>
+          )}
+
           <Link href="/auth" className="text-sm text-neutral-600 hover:text-neutral-900">
             Auth
           </Link>
@@ -54,13 +41,16 @@ export function TopNav() {
           </Link>
         </div>
         <div className="flex items-center gap-2">
-          {error ? (
-            <span className="text-xs text-red-600">{error}</span>
-          ) : authed ? (
-            <Button variant="outline" size="sm" onClick={signOut}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign out
-            </Button>
+          {loading ? (
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+          ) : user ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-neutral-600">{user.email}</span>
+              <Button variant="outline" size="sm" onClick={signOut}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign out
+              </Button>
+            </div>
           ) : (
             <Link href="/auth">
               <Button variant="default" size="sm">
