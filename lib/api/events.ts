@@ -301,7 +301,10 @@ export class EventsAPI {
 
 // Server-side functions for API routes
 export class ServerEventsAPI {
-  private supabase = createServerSupabaseClient()
+  private getSupabaseClient() {
+    // Only create client when method is called, not during class initialization
+    return createServerSupabaseClient()
+  }
 
   async getEvents(userId: string, options: {
     calendar_ids?: string[]
@@ -315,7 +318,9 @@ export class ServerEventsAPI {
     // Implementation would be similar to client-side but with user ID filtering
     const { calendar_ids, start_date, end_date, filters = {}, page = 1, limit = 50 } = options
 
-    let query = this.supabase
+    const supabase = this.getSupabaseClient()
+    
+    let query = supabase
       .from("events")
       .select(`
         *,
@@ -360,4 +365,8 @@ export class ServerEventsAPI {
 
 // Export singleton instances
 export const eventsAPI = new EventsAPI()
-export const serverEventsAPI = new ServerEventsAPI()
+
+// Export a function to create server API instance only when needed
+export function getServerEventsAPI() {
+  return new ServerEventsAPI()
+}
