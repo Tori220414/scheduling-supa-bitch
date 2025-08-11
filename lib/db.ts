@@ -35,7 +35,10 @@ function createPool() {
           // For stricter verification, use the downloaded root cert and pass 'ca'.
           rejectUnauthorized: false,
         }
-      : undefined,
+      : {
+          // Even if sslmode is in URL, we need to handle self-signed certs
+          rejectUnauthorized: false,
+        },
     max: 4, // keep modest to prevent exhausting Supabase pool
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
