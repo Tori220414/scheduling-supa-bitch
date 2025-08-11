@@ -336,15 +336,19 @@ export class CalendarsAPI {
 
 // Server-side functions for API routes
 export class ServerCalendarsAPI {
-  private supabase = createServerSupabaseClient()
+  private getSupabaseClient() {
+    // Only create client when method is called, not during class initialization
+    return createServerSupabaseClient()
+  }
 
   async getCalendars(userId: string, options: {
     include_shared?: boolean
     status?: CalendarStatus[]
   } = {}): Promise<Calendar[]> {
     const { include_shared = true, status = ['active'] } = options
-
-    let query = this.supabase
+    
+    const supabase = this.getSupabaseClient()
+    let query = supabase
       .from("calendars")
       .select("*")
       .eq("owner_id", userId)
@@ -362,7 +366,7 @@ export class ServerCalendarsAPI {
 
     // If including shared calendars, fetch those too
     if (include_shared) {
-      const { data: sharedData, error: sharedError } = await this.supabase
+      const { data: sharedData, error: sharedError } = await supabase
         .from("calendar_shares")
         .select(`
           calendar:calendars!inner(*)
@@ -386,4 +390,8 @@ export class ServerCalendarsAPI {
 
 // Export singleton instances
 export const calendarsAPI = new CalendarsAPI()
-export const serverCalendarsAPI = new ServerCalendarsAPI()
+
+// Export a function to create server API instance only when needed
+export function getServerCalendarsAPI() {
+  return new ServerCalendarsAPI()
+}
