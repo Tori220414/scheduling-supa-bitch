@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Calendar, CalendarView as CalendarViewType, Event, CreateEventForm, UpdateEventForm } from "@/lib/types"
 import { 
   CalendarDays, 
@@ -462,6 +462,12 @@ function DashboardPage() {
               <DialogTitle>
                 {selectedEvent ? 'Edit Event' : 'Create New Event'}
               </DialogTitle>
+              <DialogDescription>
+                {selectedEvent 
+                  ? 'Modify the details of this event.' 
+                  : 'Fill in the details to create a new event on your calendar.'
+                }
+              </DialogDescription>
             </DialogHeader>
             <EventForm
               event={selectedEvent}

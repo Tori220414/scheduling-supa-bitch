@@ -32,6 +32,21 @@ export function getSupabase(): SupabaseClient<Database> {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
+      detectSessionInUrl: true,
+      flowType: 'pkce',
+    },
+    global: {
+      headers: {
+        'X-Client-Info': 'scheduling-app',
+      },
+    },
+    db: {
+      schema: 'public',
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 2,
+      },
     },
   })
   return clientSupabase

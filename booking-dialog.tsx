@@ -95,7 +95,7 @@ export function BookingDialog({}: { children?: never } = { children: undefined }
 
   return (
     <Dialog open={openBooking} onOpenChange={setOpenBooking}>
-      <DialogContent aria-describedby={undefined}>
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{"New booking"}</DialogTitle>
           <DialogDescription>{"Create a new appointment."}</DialogDescription>
