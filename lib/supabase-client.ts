@@ -5,9 +5,18 @@ import { Database } from "./types"
 let clientSupabase: SupabaseClient<Database> | null = null
 
 export function getSupabase(): SupabaseClient<Database> {
-  // This function should only be called on the client side
+  // During SSR, return a mock client that won't break the build
   if (typeof window === 'undefined') {
-    throw new Error("getSupabase() should only be called on the client side")
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NDUxMjM0NTYsImV4cCI6MjAyMDY5OTQ1Nn0.placeholder'
+    
+    // Return a basic client for SSR - auth operations will be no-ops
+    return createClient<Database>(url, anonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    })
   }
 
   if (clientSupabase) return clientSupabase

@@ -23,6 +23,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
   const supabase = getSupabase()
+  
+  // During SSR, don't initialize auth
+  const isClient = typeof window !== 'undefined'
 
   // Load user profile data
   const loadUserProfile = async (authUser: User): Promise<UserProfile | undefined> => {
@@ -100,6 +103,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Initialize auth state
   useEffect(() => {
+    // Skip auth initialization during SSR
+    if (!isClient) {
+      setLoading(false)
+      return
+    }
+    
     let mounted = true
 
     // Get initial session
@@ -174,7 +183,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [supabase])
+  }, [supabase, isClient])
 
   const signIn = async (email: string, password: string): Promise<void> => {
     const { error } = await supabase.auth.signInWithPassword({
