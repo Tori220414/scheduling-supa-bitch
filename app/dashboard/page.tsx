@@ -1,58 +1,66 @@
 "use client"
-
-import * as React from "react"
-import { withAuth } from "@/lib/auth-context"
-import { useEvents } from "@/lib/hooks/use-events"
-import { useCalendars } from "@/lib/hooks/use-calendars"
+import { useState } from "react"
+import { useAuth } from "@/lib/auth-context"
+import { TopNav } from "@/components/top-nav"
+import { TaskList } from "@/components/tasks/task-list"
 import { CalendarView } from "@/components/calendar/calendar-view"
 import { EventForm } from "@/components/events/event-form"
-import { TopNav } from "@/components/top-nav"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Calendar, CalendarView as CalendarViewType, Event, CreateEventForm, UpdateEventForm } from "@/lib/types"
-import { 
-  CalendarDays, 
-  CheckCircle2, 
-  Clock, 
-  Plus, 
-  TrendingUp, 
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { useTaskStats, useUpcomingTasks, useOverdueTasks } from "@/lib/hooks/use-tasks"
+import { useEvents } from "@/lib/hooks/use-events"
+import { useCalendars } from "@/lib/hooks/use-calendars"
+import type { Event, CalendarView as CalendarViewType, CreateEventForm, UpdateEventForm } from "@/lib/types"
+import {
+  CalendarDays,
+  CheckCircle2,
+  Clock,
+  Plus,
   AlertTriangle,
   BarChart3,
-  Users,
-  Target
+  Target,
+  StickyNote,
+  Zap,
 } from "lucide-react"
 import { format, startOfMonth, endOfMonth } from "date-fns"
 
-function DashboardPage() {
-  const [currentView, setCurrentView] = React.useState<CalendarViewType>('month')
-  const [currentDate, setCurrentDate] = React.useState(new Date())
-  const [showEventForm, setShowEventForm] = React.useState(false)
-  const [selectedEvent, setSelectedEvent] = React.useState<Event | null>(null)
-  const [selectedDate, setSelectedDate] = React.useState<Date | null>(null)
+export default function DashboardPage() {
+  const { user, loading } = useAuth()
 
-  // Hooks for data management
+  // Calendar state
+  const [currentView, setCurrentView] = useState<CalendarViewType>("month")
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const [showEventForm, setShowEventForm] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
+
+  // Data hooks
+  const { stats: taskStats, loading: statsLoading } = useTaskStats()
+  const { tasks: upcomingTasks, loading: upcomingLoading } = useUpcomingTasks(7)
+  const { tasks: overdueTasks, loading: overdueLoading } = useOverdueTasks()
+
   const { calendars, loading: calendarsLoading } = useCalendars()
-  const { 
-    events, 
-    loading: eventsLoading, 
-    createEvent, 
-    updateEvent, 
-    deleteEvent, 
-    completeTask,
-    stats,
-    upcomingEvents,
-    overdueEvents
+  const {
+    events,
+    loading: eventsLoading,
+    createEvent,
+    updateEvent,
+    deleteEvent,
+    stats: eventStats,
   } = useEvents({
-    start_date: format(startOfMonth(currentDate), 'yyyy-MM-dd'),
-    end_date: format(endOfMonth(currentDate), 'yyyy-MM-dd'),
-    calendar_ids: calendars.map(c => c.id)
+    start_date: format(startOfMonth(currentDate), "yyyy-MM-dd"),
+    end_date: format(endOfMonth(currentDate), "yyyy-MM-dd"),
+    calendar_ids: calendars.map((c) => c.id),
   })
 
-  const activeCalendars = calendars.filter(c => c.status === 'active')
+  // Mock data for other features that aren't implemented yet
+  const mockStats = {
+    notes: { total: 15, recent: 5 },
+    goals: { total: 4, active: 3, completed: 1 },
+    habits: { total: 6, streak: 5, completed_today: 4 },
+  }
 
   const handleEventClick = (event: Event) => {
     setSelectedEvent(event)
@@ -60,267 +68,243 @@ function DashboardPage() {
   }
 
   const handleDateClick = (date: Date) => {
-    setSelectedDate(date)
     setSelectedEvent(null)
+    setCurrentDate(date)
     setShowEventForm(true)
   }
 
-  const handleCreateEvent = (date: Date) => {
-    setSelectedDate(date)
+  const handleCreateEvent = (date?: Date) => {
     setSelectedEvent(null)
+    if (date) setCurrentDate(date)
     setShowEventForm(true)
   }
 
   const handleEventSubmit = async (eventData: CreateEventForm | UpdateEventForm) => {
-    if ('id' in eventData) {
-      // Update existing event
+    if ("id" in eventData) {
       await updateEvent(eventData)
     } else {
-      // Create new event
-      if (selectedDate) {
-        eventData.start_time = format(selectedDate, "yyyy-MM-dd'T'HH:mm")
-      }
       await createEvent(eventData)
     }
-    
     setShowEventForm(false)
     setSelectedEvent(null)
-    setSelectedDate(null)
   }
 
   const handleEventCancel = () => {
     setShowEventForm(false)
     setSelectedEvent(null)
-    setSelectedDate(null)
   }
 
-  const renderQuickStats = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Events</CardTitle>
-          <CalendarDays className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{stats.total}</div>
-          <p className="text-xs text-muted-foreground">
-            This month
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Completed</CardTitle>
-          <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{stats.completed}</div>
-          <p className="text-xs text-muted-foreground">
-            {stats.completion_rate}% completion rate
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Upcoming</CardTitle>
-          <Clock className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{stats.upcoming}</div>
-          <p className="text-xs text-muted-foreground">
-            Next 7 days
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Overdue</CardTitle>
-          <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-red-600">{stats.overdue}</div>
-          <p className="text-xs text-muted-foreground">
-            Needs attention
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  )
-
-  const renderUpcomingEvents = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Clock className="h-5 w-5" />
-          Upcoming Events
-        </CardTitle>
-        <CardDescription>
-          Your next {upcomingEvents.length} events
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {upcomingEvents.slice(0, 5).map((event) => (
-            <div
-              key={event.id}
-              className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
-              onClick={() => handleEventClick(event)}
-            >
-              <div className="flex-1">
-                <div className="font-medium">{event.title}</div>
-                <div className="text-sm text-gray-500">
-                  {format(new Date(event.start_time), 'MMM d, h:mm a')}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline">{event.type}</Badge>
-                <Badge 
-                  variant="outline"
-                  className={
-                    event.priority === 'high' ? "border-red-200 text-red-700" :
-                    event.priority === 'medium' ? "border-yellow-200 text-yellow-700" :
-                    "border-green-200 text-green-700"
-                  }
-                >
-                  {event.priority}
-                </Badge>
-              </div>
-            </div>
-          ))}
-          
-          {upcomingEvents.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>No upcoming events</p>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="mt-2"
-                onClick={() => handleCreateEvent(new Date())}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create Event
-              </Button>
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  )
-
-  const renderOverdueEvents = () => {
-    if (overdueEvents.length === 0) return null
-
+  if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-red-600">
-            <AlertTriangle className="h-5 w-5" />
-            Overdue Events
-          </CardTitle>
-          <CardDescription>
-            {overdueEvents.length} events need your attention
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {overdueEvents.slice(0, 3).map((event) => (
-              <div
-                key={event.id}
-                className="flex items-center justify-between p-3 border border-red-200 rounded-lg bg-red-50 hover:bg-red-100 cursor-pointer"
-                onClick={() => handleEventClick(event)}
-              >
-                <div className="flex-1">
-                  <div className="font-medium">{event.title}</div>
-                  <div className="text-sm text-red-600">
-                    Due {format(new Date(event.start_time), 'MMM d, h:mm a')}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {event.type === 'task' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        completeTask(event.id)
-                      }}
-                    >
-                      Complete
-                    </Button>
-                  )}
-                  <Badge variant="outline" className="border-red-200 text-red-700">
-                    Overdue
-                  </Badge>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="min-h-screen bg-background">
+        <TopNav />
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
     )
   }
 
-  const renderCalendars = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CalendarDays className="h-5 w-5" />
-          My Calendars
-        </CardTitle>
-        <CardDescription>
-          {activeCalendars.length} active calendars
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {activeCalendars.map((calendar) => (
-            <div
-              key={calendar.id}
-              className="flex items-center justify-between p-3 border rounded-lg"
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-4 h-4 rounded"
-                  style={{ backgroundColor: calendar.color }}
-                />
-                <div>
-                  <div className="font-medium">{calendar.name}</div>
-                  <div className="text-sm text-gray-500 capitalize">
-                    {calendar.type}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {calendar.is_default && (
-                  <Badge variant="secondary" size="sm">Default</Badge>
-                )}
-                <Badge variant="outline" size="sm">
-                  {events.filter(e => e.calendar_id === calendar.id).length}
-                </Badge>
-              </div>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  )
-
-  if (calendarsLoading || eventsLoading) {
+  if (!user) {
     return (
       <div className="min-h-screen bg-background">
         <TopNav />
         <div className="container mx-auto py-8">
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="text-center">
+            <h1 className="text-2xl font-bold mb-4">Please sign in to access your dashboard</h1>
+            <Button onClick={() => (window.location.href = "/auth")}>Sign In</Button>
           </div>
         </div>
       </div>
     )
   }
+
+  const renderQuickStats = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Tasks</CardTitle>
+          <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{statsLoading ? "..." : `${taskStats.completed}/${taskStats.total}`}</div>
+          <p className="text-xs text-muted-foreground">
+            {statsLoading ? "Loading..." : `${taskStats.pending} pending`}
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Events</CardTitle>
+          <CalendarDays className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{eventsLoading ? "..." : eventStats.upcoming}</div>
+          <p className="text-xs text-muted-foreground">{eventsLoading ? "Loading..." : `${eventStats.total} total`}</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Notes</CardTitle>
+          <StickyNote className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{mockStats.notes.total}</div>
+          <p className="text-xs text-muted-foreground">{mockStats.notes.recent} recent</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Goals</CardTitle>
+          <Target className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">
+            {mockStats.goals.active}/{mockStats.goals.total}
+          </div>
+          <p className="text-xs text-muted-foreground">{mockStats.goals.completed} completed</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Habits</CardTitle>
+          <Zap className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">
+            {mockStats.habits.completed_today}/{mockStats.habits.total}
+          </div>
+          <p className="text-xs text-muted-foreground">{mockStats.habits.streak} day streak</p>
+        </CardContent>
+      </Card>
+    </div>
+  )
+
+  const renderRecentActivity = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Clock className="h-5 w-5" />
+          Recent Activity
+        </CardTitle>
+        <CardDescription>Your latest updates and achievements</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {!statsLoading && taskStats.completed > 0 && (
+            <div className="flex items-center gap-3 p-3 border rounded-lg">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              <div className="flex-1">
+                <p className="font-medium">Completed {taskStats.completed} tasks</p>
+                <p className="text-sm text-muted-foreground">{taskStats.completion_rate}% completion rate</p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-3 p-3 border rounded-lg">
+            <StickyNote className="h-5 w-5 text-blue-600" />
+            <div className="flex-1">
+              <p className="font-medium">Notes feature coming soon</p>
+              <p className="text-sm text-muted-foreground">Will be implemented next</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-3 border rounded-lg">
+            <Zap className="h-5 w-5 text-purple-600" />
+            <div className="flex-1">
+              <p className="font-medium">Habits tracking coming soon</p>
+              <p className="text-sm text-muted-foreground">Will be implemented next</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-3 border rounded-lg">
+            <Target className="h-5 w-5 text-orange-600" />
+            <div className="flex-1">
+              <p className="font-medium">Goals tracking coming soon</p>
+              <p className="text-sm text-muted-foreground">Will be implemented next</p>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+
+  const renderQuickActions = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle>Quick Actions</CardTitle>
+        <CardDescription>Get started with common tasks</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 gap-3">
+          <Button variant="outline" className="h-20 flex-col gap-2 bg-transparent">
+            <Plus className="h-5 w-5" />
+            <span className="text-sm">New Task</span>
+          </Button>
+
+          <Button variant="outline" className="h-20 flex-col gap-2 bg-transparent">
+            <CalendarDays className="h-5 w-5" />
+            <span className="text-sm">Schedule Event</span>
+          </Button>
+
+          <Button variant="outline" className="h-20 flex-col gap-2 bg-transparent">
+            <StickyNote className="h-5 w-5" />
+            <span className="text-sm">Write Note</span>
+          </Button>
+
+          <Button variant="outline" className="h-20 flex-col gap-2 bg-transparent">
+            <Target className="h-5 w-5" />
+            <span className="text-sm">Set Goal</span>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+
+  const renderUpcomingTasks = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <AlertTriangle className="h-5 w-5" />
+          Upcoming Tasks
+        </CardTitle>
+        <CardDescription>Tasks due in the next 7 days</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {upcomingLoading ? (
+            <div className="text-center py-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+            </div>
+          ) : upcomingTasks.length === 0 ? (
+            <div className="text-center py-4 text-muted-foreground">No upcoming tasks</div>
+          ) : (
+            upcomingTasks.slice(0, 3).map((task) => (
+              <div key={task.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex-1">
+                  <div className="font-medium">{task.title}</div>
+                  <div className="text-sm text-muted-foreground">
+                    Due {task.due_date ? format(new Date(task.due_date), "MMM d, yyyy") : "No due date"}
+                  </div>
+                </div>
+                <Badge
+                  variant={
+                    task.priority === "urgent" ? "destructive" : task.priority === "high" ? "secondary" : "outline"
+                  }
+                >
+                  {task.priority}
+                </Badge>
+              </div>
+            ))
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
 
   return (
     <div className="min-h-screen bg-background">
@@ -329,140 +313,96 @@ function DashboardPage() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-            <p className="text-muted-foreground">
-              Welcome to your scheduling dashboard
-            </p>
+            <p className="text-muted-foreground">Welcome back, {user.email}</p>
           </div>
-          <Button onClick={() => handleCreateEvent(new Date())}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Event
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline">
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Analytics
+            </Button>
+            <Button onClick={() => handleCreateEvent()}>
+              <Plus className="h-4 w-4 mr-2" />
+              Quick Add
+            </Button>
+          </div>
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="tasks">Tasks</TabsTrigger>
             <TabsTrigger value="calendar">Calendar</TabsTrigger>
-            <TabsTrigger value="events">Events</TabsTrigger>
+            <TabsTrigger value="notes">Notes</TabsTrigger>
+            <TabsTrigger value="goals">Goals</TabsTrigger>
+            <TabsTrigger value="habits">Habits</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
             {renderQuickStats()}
-            
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-6">
-                {renderOverdueEvents()}
-                {renderUpcomingEvents()}
+                {renderRecentActivity()}
+                {renderUpcomingTasks()}
               </div>
-              <div>
-                {renderCalendars()}
-              </div>
+              <div className="space-y-6">{renderQuickActions()}</div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="tasks" className="space-y-6">
+            <TaskList />
           </TabsContent>
 
           <TabsContent value="calendar" className="space-y-6">
-            <CalendarView
-              view={currentView}
-              date={currentDate}
-              events={events}
-              calendars={calendars}
-              onEventClick={handleEventClick}
-              onDateClick={handleDateClick}
-              onViewChange={setCurrentView}
-              onDateChange={setCurrentDate}
-              onCreateEvent={handleCreateEvent}
-            />
+            {calendarsLoading || eventsLoading ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : (
+              <CalendarView
+                view={currentView}
+                date={currentDate}
+                events={events}
+                calendars={calendars}
+                onEventClick={handleEventClick}
+                onDateClick={handleDateClick}
+                onViewChange={setCurrentView}
+                onDateChange={setCurrentDate}
+                onCreateEvent={handleCreateEvent}
+              />
+            )}
           </TabsContent>
 
-          <TabsContent value="events" className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold">All Events</h2>
-              <Button onClick={() => handleCreateEvent(new Date())}>
-                <Plus className="h-4 w-4 mr-2" />
-                New Event
-              </Button>
+          <TabsContent value="notes" className="space-y-6">
+            <div className="text-center py-12">
+              <StickyNote className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">Notes Management</h3>
+              <p className="text-muted-foreground mb-4">Notes features will be implemented next</p>
+              <Button variant="outline">Coming Soon</Button>
             </div>
-            
-            <div className="grid gap-4">
-              {events.map((event) => (
-                <Card key={event.id} className="cursor-pointer hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-semibold">{event.title}</h3>
-                          <Badge variant="outline">{event.type}</Badge>
-                          <Badge 
-                            variant="outline"
-                            className={
-                              event.priority === 'high' ? "border-red-200 text-red-700" :
-                              event.priority === 'medium' ? "border-yellow-200 text-yellow-700" :
-                              "border-green-200 text-green-700"
-                            }
-                          >
-                            {event.priority}
-                          </Badge>
-                          <Badge 
-                            variant={event.status === 'completed' ? 'default' : 'secondary'}
-                            className={
-                              event.status === 'completed' ? "bg-green-100 text-green-800" :
-                              event.status === 'in_progress' ? "bg-blue-100 text-blue-800" :
-                              ""
-                            }
-                          >
-                            {event.status.replace('_', ' ')}
-                          </Badge>
-                        </div>
-                        {event.description && (
-                          <p className="text-sm text-gray-600 mb-2">{event.description}</p>
-                        )}
-                        <p className="text-sm text-gray-500">
-                          {format(new Date(event.start_time), 'MMM d, yyyy h:mm a')}
-                          {event.end_time && ` - ${format(new Date(event.end_time), 'h:mm a')}`}
-                        </p>
-                        {event.location && (
-                          <p className="text-sm text-gray-500 mt-1">📍 {event.location}</p>
-                        )}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEventClick(event)}
-                      >
-                        Edit
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              
-              {events.length === 0 && (
-                <Card>
-                  <CardContent className="p-8 text-center">
-                    <CalendarDays className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                    <h3 className="font-medium text-gray-900 mb-2">No events found</h3>
-                    <p className="text-gray-500 mb-4">
-                      Get started by creating your first event.
-                    </p>
-                    <Button onClick={() => handleCreateEvent(new Date())}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Event
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
+          </TabsContent>
+
+          <TabsContent value="goals" className="space-y-6">
+            <div className="text-center py-12">
+              <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">Goals Tracking</h3>
+              <p className="text-muted-foreground mb-4">Goal tracking features will be implemented next</p>
+              <Button variant="outline">Coming Soon</Button>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="habits" className="space-y-6">
+            <div className="text-center py-12">
+              <Zap className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">Habits System</h3>
+              <p className="text-muted-foreground mb-4">Habit tracking features will be implemented next</p>
+              <Button variant="outline">Coming Soon</Button>
             </div>
           </TabsContent>
         </Tabs>
 
         {/* Event Form Dialog */}
         <Dialog open={showEventForm} onOpenChange={setShowEventForm}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {selectedEvent ? 'Edit Event' : 'Create New Event'}
-              </DialogTitle>
-            </DialogHeader>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
             <EventForm
               event={selectedEvent}
               calendars={calendars}
@@ -476,5 +416,3 @@ function DashboardPage() {
     </div>
   )
 }
-
-export default withAuth(DashboardPage)
